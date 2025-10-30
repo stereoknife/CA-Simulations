@@ -3,9 +3,8 @@
 #include "model.h"
 #include <QOpenGLFunctions_3_3_Core>
 
-
 SceneFluid::SceneFluid() {
-    widget = new WidgetFountain();
+    widget = new WidgetFluid();
     connect(widget, SIGNAL(updatedParameters()), this, SLOT(updateSimParams()));
 }
 
@@ -18,6 +17,9 @@ SceneFluid::~SceneFluid() {
     if (vaoSphereL) delete vaoSphereL;
     if (vaoCube)    delete vaoCube;
     if (fGravity)   delete fGravity;
+    for (auto n : neighbours) {
+        if (n) delete n;
+    }
 }
 
 
@@ -48,16 +50,31 @@ void SceneFluid::initialize() {
     glutils::checkGLError();
 
     // create forces
-    fGravity = new ForceConstAcceleration();
-    system.addForce(fGravity);
+    //fGravity = new ForceConstAcceleration();
+    //system.addForce(fGravity);
 
-    // scene description
-    fountainPos = Vec3(0, 80, 0);    
-    colliderFloor.setPlane(Vec3(0, 1, 0), 0);    
-    colliderRamp.setPlane(Vec3(0, std::sqrt(3.0)/2.0, 0.5), 6);
+    // scene
+    box_size = 50.0;
+    fountainPos = Vec3(0, 80, 0);
+    colliderFloor.setPlane(Vec3(0, 1, 0), 0);
+    colliderNorth.setPlane(Vec3(0, 0, 1), box_size);
+    colliderSouth.setPlane(Vec3(0, 0, -1), box_size);
+    colliderEast.setPlane(Vec3(1, 0, 0), box_size);
+    colliderWest.setPlane(Vec3(-1, 0, 0), box_size);
     colliderSphere.setCenter(Vec3(0,0,0));
     colliderSphere.setRadius(20);
-    colliderBox.setFromBounds(Vec3(30,0,20), Vec3(50,10,60));
+
+    draw_walls = false;
+
+    num_x = num_y = num_z = 10;
+    num_total = num_x * num_y * num_z;
+    densities.resize(num_total);
+    pressures.resize(num_total);
+    neighbours.resize(num_total);
+    for (int i = 0; i < num_total; ++i) {
+        neighbours[i] = new std::vector<Particle*>();
+    }
+    //updateSimParams();
 }
 
 
@@ -66,24 +83,44 @@ void SceneFluid::reset()
     // update values from UI
     updateSimParams();
 
-    // reset random seed
-    Random::seed(1337);
-
     // erase all particles
-    fGravity->clearInfluencedParticles();
+    //fGravity->clearInfluencedParticles();
     system.deleteParticles();
     deadParticles.clear();
 
-    int numParticles = 1000;
+    const double box_size = 50;
+    double size_x = box_size;
+    double size_y = box_size;
+    double size_z = box_size;
+    double step = particle_size * 4;
 
-    double cube_x = 5;
-    double cube_y = 5;
-    double cube_z = 5;
+    for(int i = 0; i < num_z; ++i) {
+        for (int j = 0; j < num_y; ++j) {
+            for (int k = 0; k < num_x; ++k) {
+                int idx = i * num_z * num_z + j * num_y + k;
 
-    double step_x = cube_x;
+                // TODO: you can play here with different start positions and/or fixed particles
+                double tx = 1 + k*step - box_size;// * (k > numParticlesX/2 ? 1.0 : -1.0);
+                double ty = 1 + j*step;
+                double tz = 1 + i*step - box_size;
+                Vec3 pos = Vec3(tx, ty, tz);
 
-    for(int i = 0; i < numParticles; ++i) {
+                //std::cout << pos << std::endl;
 
+                Particle* p = new Particle();
+                p->id = idx;
+                p->pos = pos;
+                p->prevPos = pos;
+                p->vel = Vec3(0,0,0);
+                p->mass = particle_mass;
+                p->color = Vec3(153/255.0, 217/255.0, 234/255.0);
+                p->radius = particle_size;
+                //p->life = maxParticleLife;
+
+                system.addParticle(p);
+                //fGravity->addInfluencedParticle(p);
+            }
+        }
     }
 }
 
@@ -91,14 +128,27 @@ void SceneFluid::reset()
 void SceneFluid::updateSimParams()
 {
     // get gravity from UI and update force
-    double g = widget->getGravity();
-    fGravity->setAcceleration(Vec3(0, -g, 0));
+    //double g = widget->getGravity();
+    //fGravity->setAcceleration(Vec3(0, -g, 0));
 
     // get other relevant UI values and update simulation params
     kBounce = 0.5;
     kFriction = 0.1;
     maxParticleLife = 10.0;
     emitRate = 100;
+
+    colour = (ColourMode)widget->getColour();
+    draw_walls = widget->getDrawColliders();
+    ref_density = widget->getReferenceDensity();
+    particle_mass = widget->getParticleMass();
+    dyn_viscosity = widget->getViscosity();
+    c = widget->getSpeedOfSound();
+    kernel_size = widget->getKernelSize();
+    neighbourhood_size = widget->getNeighbourhoodSize();
+    particle_size = widget->getParticleSize();
+    for (auto n : neighbours) {
+        n->resize(neighbourhood_size);
+    }
 }
 
 
@@ -137,14 +187,36 @@ void SceneFluid::paint(const Camera& camera) {
     shader->setUniformValue("matshin", 0.0f);
     glFuncs->glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-    // draw ramp
-    modelMat = QMatrix4x4();
-    modelMat.rotate(30.0, QVector3D(1, 0, 0));
-    modelMat.translate(0, -6, 0);
-    modelMat.scale(100, 1, 100);
-    modelMat.translate(0, 0, -1);
-    shader->setUniformValue("ModelMatrix", modelMat);
-    glFuncs->glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    // draw walls
+    if (draw_walls) {
+        modelMat = QMatrix4x4();
+        modelMat.rotate(90.0, QVector3D(1, 0, 0));
+        modelMat.translate(0, -box_size, 0);
+        modelMat.scale(100, 1, 100);
+        shader->setUniformValue("ModelMatrix", modelMat);
+        glFuncs->glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        modelMat = QMatrix4x4();
+        modelMat.rotate(90.0, QVector3D(1, 0, 0));
+        modelMat.translate(0, box_size, 0);
+        modelMat.scale(100, 1, 100);
+        shader->setUniformValue("ModelMatrix", modelMat);
+        glFuncs->glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        modelMat = QMatrix4x4();
+        modelMat.rotate(90.0, QVector3D(0, 0, 1));
+        modelMat.translate(0, -box_size, 0);
+        modelMat.scale(100, 1, 100);
+        shader->setUniformValue("ModelMatrix", modelMat);
+        glFuncs->glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        modelMat = QMatrix4x4();
+        modelMat.rotate(90.0, QVector3D(0, 0, 1));
+        modelMat.translate(0, box_size, 0);
+        modelMat.scale(100, 1, 100);
+        shader->setUniformValue("ModelMatrix", modelMat);
+        glFuncs->glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    }
 
     // draw the particles
     vaoSphereL->bind();
@@ -165,6 +237,7 @@ void SceneFluid::paint(const Camera& camera) {
         glFuncs->glDrawElements(GL_TRIANGLES, 3*numFacesSphereL, GL_UNSIGNED_INT, 0);
     }
 
+    /*
     // draw sphere
     vaoSphereH->bind();
     Vec3 cc = colliderSphere.getCenter();
@@ -191,41 +264,91 @@ void SceneFluid::paint(const Camera& camera) {
     glFuncs->glDrawElements(GL_TRIANGLES, 3*2*6, GL_UNSIGNED_INT, 0);
     vaoCube->release();
     shader->release();
+*/
+}
+
+double poly6(double r, double h) {
+    if (r < 0 || h < r) return 0;
+    return (315/(64*M_PI*std::pow(h,9)))*std::pow((h*h)-(r*r),3);
+}
+
+double spiky(double r, double h) {
+    if (r < 0 || h < r) return 0;
+    return (15/(M_PI*std::pow(h, 6)))*std::pow(h-r, 3);
+}
+
+Vec3 spiky_grad(Vec3 d, double r, double h) {
+    return -d * (45/(M_PI*std::pow(h,6)*r)) * std::pow((h-r),2);
+}
+
+double viscosity_lapl(double r, double h){
+    return (45/(M_PI * std::pow(h, 5)))*(1-(r/h));
 }
 
 
 void SceneFluid::update(double dt) {
+    // SPH
+    densities.clear();
+    pressures.clear();
 
-    // emit new particles, reuse dead ones if possible
-    int emitParticles = std::max(1, int(std::round(emitRate * dt)));
-    for (int i = 0; i < emitParticles; i++) {
-        Particle* p;
-        if (!deadParticles.empty()) {
-            // reuse one dead particle
-            p = deadParticles.front();
-            deadParticles.pop_front();
+    // 1. Find neighbours for each particle and store in a list
+    std::vector<std::tuple<double, Particle*>> particles((num_x * num_y * num_z));
+    for (Particle* p : system.getParticles()) {
+        particles.clear();
+        for (Particle* o : system.getParticles()) {
+            if(p->id == o->id) continue;
+            particles.emplace_back((p->pos - o->pos).squaredNorm(), o);
         }
-        else {
-            // create new particle
-            p = new Particle();
-            system.addParticle(p);
-
-            // don't forget to add particle to forces that affect it
-            fGravity->addInfluencedParticle(p);
+        std::sort(particles.begin(), particles.end(), [](auto a, auto b){return std::get<0>(a) < std::get<0>(b);});
+        for (int i = 0; i < neighbourhood_size; ++i) {
+            (*neighbours[p->id])[i] = std::get<1>(particles[i]);
         }
-
-        p->color = Vec3(153/255.0, 217/255.0, 234/255.0);
-        p->radius = 1.0;
-        p->life = maxParticleLife;
-
-        double x = Random::get(-20.0, 20.0);
-        double y = 0;
-        double z = Random::get(-20.0, 20.0);
-        p->pos = Vec3(x, y, z) + fountainPos;
-        p->vel = Vec3(0,0,0);
     }
 
-    // integration step
+    // 2. Calculate density for each particle
+    for (Particle* p : system.getParticles()) {
+        double d = p->mass * poly6(0, kernel_size);
+        for(auto o : *neighbours[p->id]){
+            //std::cout << "Dist: " << (p->pos-o->pos).norm() << ", Range: " << kernel_size << std::endl;
+            auto dd = o->mass * poly6((p->pos-o->pos).norm(), kernel_size);
+            //if (p->id == 555) std::cout << dd << std::endl;
+            d += dd;
+        }
+        densities[p->id] = d;
+    }
+
+    // 3. Calculate pressure for each particle
+    for (Particle* p : system.getParticles()) {
+        auto pressure = c * c * (densities[p->id] - ref_density);
+        pressures[p->id] = pressure;
+        //if (p->id == 555) std::cout << "Density: " << densities[p->id] << ", Pressure: " << pressures[p->id] << std::endl;
+    }
+
+    // 4. Calculate all type of accelerations for each particle
+    for (Particle* i : system.getParticles()) {
+        i->force = Vec3(0,0,0);
+
+        Vec3 pressure_acc(0,0,0), viscosity_acc(0,0,0), interactive_acc(0,0,0), gravity_acc(0,-9.8,0);
+
+        //std::cout << "Density: " << densities[i->id] << ", Pressure: " << pressures[i->id] << std::endl;
+
+        for (auto j : *neighbours[i->id]) {
+            double pij = j->mass * ((pressures[i->id]/std::pow(densities[i->id],2)) + (pressures[j->id]/std::pow(densities[j->id],2)));
+            Vec3 d = j->pos - i->pos;
+            double r = d.norm();
+
+            pressure_acc += pij * spiky_grad(d, d.norm(), kernel_size);
+
+            Vec3 vij = dyn_viscosity * j->mass * ((j->vel - i->vel)/(densities[i->id]*densities[j->id]));
+            viscosity_acc += vij * viscosity_lapl(r, kernel_size);
+        }
+
+        //std::cout << "Pressure: " << pressure_acc.transpose() << ",  Viscosity: " << viscosity_acc.transpose() << std::endl;
+        Vec3 total_acc = pressure_acc + viscosity_acc + interactive_acc + gravity_acc;
+        i->force = total_acc * i->mass;
+    }
+
+    // 5. Find new velocities and positions by using the same integration method as before
     Vecd ppos = system.getPositions();
     integrator.step(system, dt);
     system.setPreviousPositions(ppos);
@@ -236,25 +359,54 @@ void SceneFluid::update(double dt) {
         if (colliderFloor.testCollision(p, colInfo)) {
             colliderFloor.resolveCollision(p, colInfo, kBounce, kFriction);
         }
-        if (colliderRamp.testCollision(p, colInfo)) {
-            colliderRamp.resolveCollision(p, colInfo, kBounce, kFriction);
+        if (colliderNorth.testCollision(p, colInfo)) {
+            colliderNorth.resolveCollision(p, colInfo, kBounce, kFriction);
+        }
+        if (colliderSouth.testCollision(p, colInfo)) {
+            colliderSouth.resolveCollision(p, colInfo, kBounce, kFriction);
+        }
+        if (colliderEast.testCollision(p, colInfo)) {
+            colliderEast.resolveCollision(p, colInfo, kBounce, kFriction);
+        }
+        if (colliderWest.testCollision(p, colInfo)) {
+            colliderWest.resolveCollision(p, colInfo, kBounce, kFriction);
         }
         if (colliderSphere.testCollision(p, colInfo)) {
             colliderSphere.resolveCollision(p, colInfo, kBounce, kFriction);
         }
-        if (colliderBox.testCollision(p, colInfo)) {
-            colliderBox.resolveCollision(p, colInfo, kBounce, kFriction);
-        }
     }
 
-    // check dead particles
-    for (Particle* p : system.getParticles()) {
-        if (p->life > 0) {
-            p->life -= dt;
-            if (p->life < 0) {
-                deadParticles.push_back(p);
+    //6. Colour particles
+    switch(colour) {
+    case ColourMode::Neighbourhood: {
+        auto p = system.getParticles()[555];
+        p->color = Vec3(0,1,0);
+        for (auto o : *neighbours[555]) {
+            double norm = (p->pos - o->pos).norm();
+            if (norm <= neighbourhood_size) {
+                o->color = Vec3(1-norm/neighbourhood_size, 0, 0);
             }
         }
+    } break;
+    case ColourMode::Density:
+        for (auto p : system.getParticles()) {
+            auto d = densities[p->id];
+            p->color = Vec3((d-1)*10,0,1-(d-1)*10);
+        }
+        break;
+    case ColourMode::Pressure:
+        for (auto p : system.getParticles()) {
+            auto d = densities[p->id];
+            if (d < 0) {
+                p->color = Vec3(1+d/10,1+d/10,1);
+            } else {
+                p->color = Vec3(1,1-d/10,1-d/10);
+            }
+        }
+        break;
+    case ColourMode::None:
+    default:
+        break;
     }
 }
 
@@ -279,11 +431,13 @@ void SceneFluid::mouseMoved(const QMouseEvent* e, const Camera& cam)
             // move fountain
             fountainPos += disp;
         }
+        /*
         else if (e->modifiers() & Qt::ShiftModifier){
             // move box
             colliderBox.setFromCenterSize(
                         colliderBox.getCenter() + disp,
                         colliderBox.getSize());
         }
+        */
     }
 }

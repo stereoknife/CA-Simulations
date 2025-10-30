@@ -30,6 +30,7 @@ SOURCES += \
     code/scenes/scenerope.cpp \
     code/scenes/scenetestcolliders.cpp \
     code/scenes/scenetestintegrators.cpp \
+    code/widgets/widgetfluid.cpp \
     code/widgets/widgetnbody.cpp \
     code/widgets/widgetcloth.cpp \
     code/widgets/widgetfountain.cpp \
@@ -59,6 +60,7 @@ HEADERS += \
     code/scenes/scenerope.h \
     code/scenes/scenetestcolliders.h \
     code/scenes/scenetestintegrators.h \
+    code/widgets/widgetfluid.h \
     code/widgets/widgetnbody.h \
     code/widgets/widgetcloth.h \
     code/widgets/widgetfountain.h \
@@ -70,6 +72,7 @@ HEADERS += \
 FORMS += \
     forms/mainwindow.ui \
     forms/widgetcloth.ui \
+    forms/widgetfluid.ui \
     forms/widgetfountain.ui \
     forms/widgetnbody.ui \
     forms/widgetprojectiles.ui \

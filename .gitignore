@@ -53,3 +53,5 @@ compile_commands.json
 
 *_qmlcache.qrc
 build/
+Simulations.app
+.qtc_clangd/

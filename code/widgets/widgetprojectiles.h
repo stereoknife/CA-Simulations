@@ -4,7 +4,7 @@
 #include <QWidget>
 
 namespace Ui {
-class WidgetProjectiles;
+class WidgetFluid;
 }
 
 class WidgetProjectiles : public QWidget
@@ -29,7 +29,7 @@ public:
     void setSolver2(int idx);
 
 private:
-    Ui::WidgetProjectiles *ui;
+    Ui::WidgetFluid *ui;
 };
 
 #endif // WIDGETPROJECTILES_H

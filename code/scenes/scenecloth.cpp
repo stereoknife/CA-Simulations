@@ -431,46 +431,6 @@ void SceneCloth::update(double dt)
                 p2->pos += dir * dist;
             }
         }
-        /*
-        for (ForceSpring* f : springsShear) {
-            auto p1 = f->getParticle1();
-            auto p2 = f->getParticle2();
-
-            auto d2 = (p2->pos - p1->pos).normalized();
-            auto d1 = -d2;
-
-            auto midpoint = (p1->pos + p2->pos) * 0.5;
-            auto d = f->getRestLength() * 0.5;
-
-            if (fixedParticle[p1->id]) {
-                p2->pos = p1->pos + d1 * f->getRestLength();
-            } else if (fixedParticle[p2->id]) {
-                p1->pos = p2->pos + d2 * f->getRestLength();
-            } else {
-                p1->pos = midpoint + d1 * d;
-                p2->pos = midpoint + d2 * d;
-            }
-        }
-        for (ForceSpring* f : springsBend) {
-            auto p1 = f->getParticle1();
-            auto p2 = f->getParticle2();
-
-            auto d2 = (p2->pos - p1->pos).normalized();
-            auto d1 = -d2;
-
-            auto midpoint = (p1->pos + p2->pos) * 0.5;
-            auto d = f->getRestLength() * 0.5;
-
-            if (fixedParticle[p1->id]) {
-                p2->pos = p1->pos + d1 * f->getRestLength();
-            } else if (fixedParticle[p2->id]) {
-                p1->pos = p2->pos + d2 * f->getRestLength();
-            } else {
-                p1->pos = midpoint + d1 * d;
-                p2->pos = midpoint + d2 * d;
-            }
-        }
-        */
     }
     //*/
 

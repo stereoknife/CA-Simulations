@@ -5,7 +5,7 @@
 #include <QOpenGLVertexArrayObject>
 #include <list>
 #include "scene.h"
-#include "widgetfountain.h"
+#include "widgetfluid.h"
 #include "particlesystem.h"
 #include "integrators.h"
 #include "colliders.h"
@@ -13,6 +13,10 @@
 class SceneFluid : public Scene
 {
     Q_OBJECT
+
+    enum struct ColourMode {
+        None, Neighbourhood, Density, Pressure
+    };
 
 public:
     SceneFluid();
@@ -38,7 +42,7 @@ public slots:
     void updateSimParams();
 
 protected:
-    WidgetFountain* widget = nullptr;
+    WidgetFluid* widget = nullptr;
 
     QOpenGLShaderProgram* shader = nullptr;
     QOpenGLVertexArrayObject* vaoSphereL = nullptr;
@@ -52,9 +56,8 @@ protected:
     std::list<Particle*> deadParticles;
     ForceConstAcceleration* fGravity;
 
-    ColliderPlane colliderFloor, colliderRamp;
+    ColliderPlane colliderFloor, colliderNorth, colliderSouth, colliderEast, colliderWest;
     ColliderSphere colliderSphere;
-    ColliderAABB   colliderBox;
 
     double kBounce, kFriction;
     double emitRate;
@@ -63,7 +66,21 @@ protected:
     Vec3 fountainPos;
     int mouseX, mouseY;
 
-    std::vector<Particle*> particles;
+    bool draw_walls;
+    double box_size;
+    int num_x, num_y, num_z, num_total;
+
+    double ref_density = 10;
+    double particle_mass = 1;
+    double dyn_viscosity = 0.001;
+    double c = 1;
+    double kernel_size = 10;
+    int neighbourhood_size = 50;
+    double particle_size;
+    ColourMode colour;
+
+    std::vector<std::vector<Particle*>*> neighbours;
+    std::vector<double> densities, pressures;
 };
 
 #endif // SCENEFLUID_H
