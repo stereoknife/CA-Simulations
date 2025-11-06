@@ -20,10 +20,11 @@ public:
     double getReferenceDensity() const;
     double getParticleMass() const;
     double getKernelSize() const;
-    int getNeighbourhoodSize() const;
+    double getSurfaceTension() const;
     bool getDrawColliders() const;
     double getParticleSize() const;
     int getColour() const;
+    double getGravity() const;
 
     /*
     int getSolver1() const;

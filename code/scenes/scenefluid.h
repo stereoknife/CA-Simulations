@@ -57,7 +57,7 @@ protected:
     ForceConstAcceleration* fGravity;
 
     ColliderPlane colliderFloor, colliderNorth, colliderSouth, colliderEast, colliderWest;
-    ColliderSphere colliderSphere;
+    //ColliderSphere colliderSphere;
 
     double kBounce, kFriction;
     double emitRate;
@@ -75,12 +75,18 @@ protected:
     double dyn_viscosity = 0.001;
     double c = 1;
     double kernel_size = 10;
-    int neighbourhood_size = 50;
+    double surface_tension = 50;
     double particle_size;
+    double gravity = 9.81;
+    int cell_count;
     ColourMode colour;
 
-    std::vector<std::vector<Particle*>*> neighbours;
-    std::vector<double> densities, pressures;
+    std::vector<std::vector<Particle*>*> neighbours, cells;
+    std::vector<double> densities, pressures, colors_lapl;
+    std::vector<Vec3> colors;
+
+private:
+    int hash(Vec3 position);
 };
 
 #endif // SCENEFLUID_H

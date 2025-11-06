@@ -35,8 +35,8 @@ double WidgetFluid::getKernelSize() const {
     return ui->kernel_size->value();
 }
 
-int WidgetFluid::getNeighbourhoodSize() const {
-    return ui->neighbourhood_size->value();
+double WidgetFluid::getSurfaceTension() const {
+    return ui->surface_tension->value();
 }
 
 bool WidgetFluid::getDrawColliders() const {
@@ -49,6 +49,10 @@ double WidgetFluid::getParticleSize() const {
 
 int WidgetFluid::getColour() const {
     return ui->colour->currentIndex();
+}
+
+double WidgetFluid::getGravity() const {
+    return ui->gravity->value();
 }
 
 /*

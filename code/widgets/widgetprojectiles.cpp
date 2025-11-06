@@ -3,7 +3,7 @@
 
 WidgetProjectiles::WidgetProjectiles(QWidget *parent) :
     QWidget(parent),
-    ui(new Ui::WidgetFluid)
+    ui(new Ui::WidgetProjectiles)
 {
     ui->setupUi(this);
 }
@@ -14,7 +14,7 @@ WidgetProjectiles::~WidgetProjectiles()
 }
 
 double WidgetProjectiles::getHeight() const {
-    return ui->sound_speed->value();
+    return ui->height->value();
 }
 
 double WidgetProjectiles::getGravity() const {
@@ -22,11 +22,11 @@ double WidgetProjectiles::getGravity() const {
 }
 
 double WidgetProjectiles::getAngle() const {
-    return ui->mass->value();
+    return ui->angle->value();
 }
 
 double WidgetProjectiles::getSpeed() const {
-    return ui->viscosity->value();
+    return ui->speed->value();
 }
 
 int WidgetProjectiles::getSolver1() const {

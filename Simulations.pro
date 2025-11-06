@@ -1,4 +1,4 @@
-QT       += core gui opengl
+QT       += core gui opengl concurrent
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 greaterThan(QT_MAJOR_VERSION, 5): QT += openglwidgets
 

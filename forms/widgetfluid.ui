@@ -15,67 +15,90 @@
   </property>
   <layout class="QFormLayout" name="formLayout">
    <item row="0" column="0">
+    <widget class="QLabel" name="label_10">
+     <property name="text">
+      <string>Gravity</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QDoubleSpinBox" name="gravity">
+     <property name="maximum">
+      <double>20.000000000000000</double>
+     </property>
+     <property name="singleStep">
+      <double>0.010000000000000</double>
+     </property>
+     <property name="value">
+      <double>9.810000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
     <widget class="QLabel" name="label_2">
      <property name="text">
       <string>Ref. density</string>
      </property>
     </widget>
    </item>
-   <item row="0" column="1">
+   <item row="1" column="1">
     <widget class="QDoubleSpinBox" name="density">
      <property name="singleStep">
-      <double>0.100000000000000</double>
+      <double>0.010000000000000</double>
      </property>
      <property name="value">
-      <double>10.000000000000000</double>
+      <double>1.500000000000000</double>
      </property>
     </widget>
    </item>
-   <item row="1" column="0">
+   <item row="2" column="0">
     <widget class="QLabel" name="label">
      <property name="text">
       <string>Speed of sound</string>
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
+   <item row="2" column="1">
     <widget class="QDoubleSpinBox" name="sound_speed">
      <property name="maximum">
       <double>100.000000000000000</double>
      </property>
      <property name="value">
-      <double>1.000000000000000</double>
+      <double>20.000000000000000</double>
      </property>
     </widget>
    </item>
-   <item row="2" column="0">
+   <item row="3" column="0">
     <widget class="QLabel" name="label_4">
      <property name="text">
       <string>Dynamic viscosity</string>
      </property>
     </widget>
    </item>
-   <item row="2" column="1">
+   <item row="3" column="1">
     <widget class="QDoubleSpinBox" name="viscosity">
      <property name="decimals">
       <number>3</number>
      </property>
      <property name="maximum">
-      <double>50.000000000000000</double>
+      <double>99.000000000000000</double>
+     </property>
+     <property name="singleStep">
+      <double>0.100000000000000</double>
      </property>
      <property name="value">
-      <double>0.001000000000000</double>
+      <double>30.000000000000000</double>
      </property>
     </widget>
    </item>
-   <item row="3" column="0">
+   <item row="4" column="0">
     <widget class="QLabel" name="label_3">
      <property name="text">
-      <string>Particle mass</string>
+      <string>Particle masss</string>
      </property>
     </widget>
    </item>
-   <item row="3" column="1">
+   <item row="4" column="1">
     <widget class="QDoubleSpinBox" name="mass">
      <property name="decimals">
       <number>3</number>
@@ -87,39 +110,62 @@
       <double>10000.000000000000000</double>
      </property>
      <property name="value">
-      <double>1.000000000000000</double>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="0">
-    <widget class="QLabel" name="label_7">
-     <property name="text">
-      <string>Neighbourhood size</string>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="1">
-    <widget class="QSpinBox" name="neighbourhood_size">
-     <property name="value">
-      <number>50</number>
+      <double>10.000000000000000</double>
      </property>
     </widget>
    </item>
    <item row="5" column="0">
+    <widget class="QLabel" name="label_7">
+     <property name="text">
+      <string>Surface tension</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0">
     <widget class="QLabel" name="label_8">
      <property name="text">
       <string>Kernel size</string>
      </property>
     </widget>
    </item>
-   <item row="5" column="1">
+   <item row="6" column="1">
     <widget class="QDoubleSpinBox" name="kernel_size">
      <property name="value">
-      <double>20.000000000000000</double>
+      <double>5.000000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0">
+    <widget class="QLabel" name="label_9">
+     <property name="text">
+      <string>Particle size</string>
      </property>
     </widget>
    </item>
    <item row="7" column="1">
+    <widget class="QDoubleSpinBox" name="particle_size">
+     <property name="minimum">
+      <double>0.100000000000000</double>
+     </property>
+     <property name="maximum">
+      <double>5.000000000000000</double>
+     </property>
+     <property name="singleStep">
+      <double>0.100000000000000</double>
+     </property>
+     <property name="value">
+      <double>1.000000000000000</double>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="0">
+    <widget class="QLabel" name="label_5">
+     <property name="text">
+      <string>Colour</string>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="1">
     <widget class="QComboBox" name="colour">
      <item>
       <property name="text">
@@ -143,19 +189,6 @@
      </item>
     </widget>
    </item>
-   <item row="8" column="0">
-    <widget class="QLabel" name="label_6">
-     <property name="styleSheet">
-      <string notr="true">font-weight:bold;color:darkblue</string>
-     </property>
-     <property name="text">
-      <string>Solver 2</string>
-     </property>
-    </widget>
-   </item>
-   <item row="8" column="1">
-    <widget class="QComboBox" name="solver2"/>
-   </item>
    <item row="9" column="0" colspan="2">
     <widget class="QCheckBox" name="draw_colliders">
      <property name="text">
@@ -177,27 +210,19 @@
      </property>
     </widget>
    </item>
-   <item row="6" column="1">
-    <widget class="QDoubleSpinBox" name="particle_size">
-     <property name="minimum">
-      <double>1.000000000000000</double>
+   <item row="5" column="1">
+    <widget class="QDoubleSpinBox" name="surface_tension">
+     <property name="decimals">
+      <number>3</number>
      </property>
      <property name="maximum">
       <double>100.000000000000000</double>
      </property>
-    </widget>
-   </item>
-   <item row="6" column="0">
-    <widget class="QLabel" name="label_9">
-     <property name="text">
-      <string>Particle size</string>
+     <property name="singleStep">
+      <double>0.010000000000000</double>
      </property>
-    </widget>
-   </item>
-   <item row="7" column="0">
-    <widget class="QLabel" name="label_5">
-     <property name="text">
-      <string>Colour</string>
+     <property name="value">
+      <double>1.000000000000000</double>
      </property>
     </widget>
    </item>

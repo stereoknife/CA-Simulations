@@ -1,7 +1,6 @@
 #include "scenefluid.h"
 #include "glutils.h"
 #include "model.h"
-#include <QOpenGLFunctions_3_3_Core>
 
 SceneFluid::SceneFluid() {
     widget = new WidgetFluid();
@@ -17,8 +16,11 @@ SceneFluid::~SceneFluid() {
     if (vaoSphereL) delete vaoSphereL;
     if (vaoCube)    delete vaoCube;
     if (fGravity)   delete fGravity;
-    for (auto n : neighbours) {
-        if (n) delete n;
+    for (auto x : neighbours) {
+        if (x) delete x;
+    }
+    for (auto x : cells) {
+        if (x) delete x;
     }
 }
 
@@ -54,26 +56,31 @@ void SceneFluid::initialize() {
     //system.addForce(fGravity);
 
     // scene
-    box_size = 50.0;
+    box_size = 30.0;
     fountainPos = Vec3(0, 80, 0);
     colliderFloor.setPlane(Vec3(0, 1, 0), 0);
     colliderNorth.setPlane(Vec3(0, 0, 1), box_size);
     colliderSouth.setPlane(Vec3(0, 0, -1), box_size);
     colliderEast.setPlane(Vec3(1, 0, 0), box_size);
     colliderWest.setPlane(Vec3(-1, 0, 0), box_size);
-    colliderSphere.setCenter(Vec3(0,0,0));
-    colliderSphere.setRadius(20);
+    //colliderSphere.setCenter(Vec3(0,0,0));
+    //colliderSphere.setRadius(20);
 
     draw_walls = false;
 
-    num_x = num_y = num_z = 10;
-    num_total = num_x * num_y * num_z;
+    num_x = num_y = num_z = 15;
+    num_total = num_x * num_y * num_z * 2;
+    num_z *= 2;
+    num_x /= 2;
     densities.resize(num_total);
     pressures.resize(num_total);
+    colors.resize(num_total);
+    colors_lapl.resize(num_total);
     neighbours.resize(num_total);
     for (int i = 0; i < num_total; ++i) {
         neighbours[i] = new std::vector<Particle*>();
     }
+
     //updateSimParams();
 }
 
@@ -88,16 +95,12 @@ void SceneFluid::reset()
     system.deleteParticles();
     deadParticles.clear();
 
-    const double box_size = 50;
-    double size_x = box_size;
-    double size_y = box_size;
-    double size_z = box_size;
-    double step = particle_size * 4;
+    double step = particle_size * 2;
 
     for(int i = 0; i < num_z; ++i) {
         for (int j = 0; j < num_y; ++j) {
             for (int k = 0; k < num_x; ++k) {
-                int idx = i * num_z * num_z + j * num_y + k;
+                //int idx = i * num_z * num_z + j * num_y + k;
 
                 // TODO: you can play here with different start positions and/or fixed particles
                 double tx = 1 + k*step - box_size;// * (k > numParticlesX/2 ? 1.0 : -1.0);
@@ -108,12 +111,43 @@ void SceneFluid::reset()
                 //std::cout << pos << std::endl;
 
                 Particle* p = new Particle();
-                p->id = idx;
+                p->id = system.getNumParticles();
                 p->pos = pos;
                 p->prevPos = pos;
                 p->vel = Vec3(0,0,0);
                 p->mass = particle_mass;
                 p->color = Vec3(153/255.0, 217/255.0, 234/255.0);
+                p->radius = particle_size;
+                //p->life = maxParticleLife;
+
+                system.addParticle(p);
+                //fGravity->addInfluencedParticle(p);
+            }
+        }
+    }
+
+    //step /= 2;
+
+    for(int i = 0; i < num_z; ++i) {
+        for (int j = 0; j < num_y; ++j) {
+            for (int k = 0; k < num_x; ++k) {
+                //int idx = i * num_z * num_z + j * num_y + k;
+
+                // TODO: you can play here with different start positions and/or fixed particles
+                double tx = box_size - k*step - 1;// * (k > numParticlesX/2 ? 1.0 : -1.0);
+                double ty = 1 + j*step;
+                double tz = box_size - i*step - 1;
+                Vec3 pos = Vec3(tx, ty, tz);
+
+                //std::cout << pos << std::endl;
+
+                Particle* p = new Particle();
+                p->id = system.getNumParticles();;
+                p->pos = pos;
+                p->prevPos = pos;
+                p->vel = Vec3(0,0,0);
+                p->mass = particle_mass * 2;
+                p->color = Vec3(234/255.0, 153/255.0, 217/255.0);
                 p->radius = particle_size;
                 //p->life = maxParticleLife;
 
@@ -144,10 +178,22 @@ void SceneFluid::updateSimParams()
     dyn_viscosity = widget->getViscosity();
     c = widget->getSpeedOfSound();
     kernel_size = widget->getKernelSize();
-    neighbourhood_size = widget->getNeighbourhoodSize();
+    surface_tension = widget->getSurfaceTension();
     particle_size = widget->getParticleSize();
-    for (auto n : neighbours) {
-        n->resize(neighbourhood_size);
+    gravity = widget->getGravity();
+    for (auto x : neighbours) {
+        x->resize(surface_tension);
+    }
+
+    cell_count = std::ceil((box_size * 2) / kernel_size);
+
+    for (auto x : cells) {
+        if (x) delete x;
+    }
+
+    cells.resize(cell_count * cell_count * (2 * cell_count));
+    for (int i = 0; i < cell_count * cell_count * (2 * cell_count); ++i) {
+        cells[i] = new std::vector<Particle*>(100);
     }
 }
 
@@ -269,7 +315,15 @@ void SceneFluid::paint(const Camera& camera) {
 
 double poly6(double r, double h) {
     if (r < 0 || h < r) return 0;
-    return (315/(64*M_PI*std::pow(h,9)))*std::pow((h*h)-(r*r),3);
+    return (315/(64*M_PI*std::pow(h,9)))*std::pow((h*h)-(r*r), 3);
+}
+
+Vec3 poly6_grad(Vec3 d, double r, double h) {
+    return -d * (945 / (32 * M_PI * std::pow(h, 9))) * std::pow(h*h-r*r, 2);
+}
+
+double poly6_lapl(double r, double h) {
+    return (945/(8*M_PI*std::pow(h, 9)))*(h*h-r*r)*(r*r-(3/4)*(h*h-r*r));
 }
 
 double spiky(double r, double h) {
@@ -286,66 +340,102 @@ double viscosity_lapl(double r, double h){
 }
 
 
+int SceneFluid::hash(Vec3 pos) {
+    int x = std::floor(pos.x() + box_size + kernel_size/2) / kernel_size;
+    int y = std::floor(pos.y() + box_size + kernel_size/2) / kernel_size;
+    int z = std::floor(pos.z() + box_size + kernel_size/2) / kernel_size;
+    return x * cell_count * cell_count + y + cell_count * z;
+}
+
+double ssign(double x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
+
 void SceneFluid::update(double dt) {
     // SPH
-    densities.clear();
-    pressures.clear();
+    // 0. Populate hash cells
+    for (auto x : cells) {
+        x->clear();
+    }
+    for (Particle* i : system.getParticles()) {
+        cells[hash(i->pos)]->push_back(i);
+    }
 
-    // 1. Find neighbours for each particle and store in a list
-    std::vector<std::tuple<double, Particle*>> particles((num_x * num_y * num_z));
-    for (Particle* p : system.getParticles()) {
-        particles.clear();
-        for (Particle* o : system.getParticles()) {
-            if(p->id == o->id) continue;
-            particles.emplace_back((p->pos - o->pos).squaredNorm(), o);
-        }
-        std::sort(particles.begin(), particles.end(), [](auto a, auto b){return std::get<0>(a) < std::get<0>(b);});
-        for (int i = 0; i < neighbourhood_size; ++i) {
-            (*neighbours[p->id])[i] = std::get<1>(particles[i]);
+    // 1. Find neighbours for each particle and store in a vector
+    for (Particle* i : system.getParticles()) {
+        neighbours[i->id]->clear();
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
+                for (int z = -1; z <= 1; ++z) {
+                    for (Particle* j : *cells[hash(i->pos + Vec3(x, y, z) * kernel_size)]) {
+                        if (i->id == j->id) continue;
+                        if ((i->pos - j->pos).squaredNorm() > kernel_size * kernel_size) continue;
+                        neighbours[i->id]->push_back(j);
+                    }
+                }
+            }
         }
     }
 
     // 2. Calculate density for each particle
-    for (Particle* p : system.getParticles()) {
-        double d = p->mass * poly6(0, kernel_size);
-        for(auto o : *neighbours[p->id]){
-            //std::cout << "Dist: " << (p->pos-o->pos).norm() << ", Range: " << kernel_size << std::endl;
-            auto dd = o->mass * poly6((p->pos-o->pos).norm(), kernel_size);
-            //if (p->id == 555) std::cout << dd << std::endl;
-            d += dd;
+    for (Particle* i : system.getParticles()) {
+        double density = i->mass * poly6(0, kernel_size);
+
+        for (Particle* j : *neighbours[i->id]) {
+            density += j->mass * poly6((i->pos - j->pos).norm(), kernel_size);
         }
-        densities[p->id] = d;
+
+        density += (1-colors[i->id].squaredNorm());
+        densities[i->id] = density;
+        //std::cout << density << std::endl;
     }
 
     // 3. Calculate pressure for each particle
-    for (Particle* p : system.getParticles()) {
-        auto pressure = c * c * (densities[p->id] - ref_density);
-        pressures[p->id] = pressure;
-        //if (p->id == 555) std::cout << "Density: " << densities[p->id] << ", Pressure: " << pressures[p->id] << std::endl;
+    for (Particle* i : system.getParticles()) {
+        double pressure = c * c * (densities[i->id] - (i->id > system.getNumParticles() / 2 ? ref_density * 2 : ref_density));
+        pressures[i->id] = pressure;
+        //std::cout << pressure << std::endl;
+    }
+
+    //6. Find surface
+    for (Particle* i : system.getParticles()) {
+        Vec3 color = Vec3(0,0,0);
+        double color_l = 0;
+        for (Particle* j : *neighbours[i->id]) {
+            Vec3 ij = (i->pos - j->pos);
+            double mjdj = j->mass/densities[j->id];
+            double ijn = ij.norm();
+            color += mjdj * poly6_grad(ij, ijn, kernel_size);
+            color_l += mjdj * poly6_lapl(ijn, kernel_size);
+        }
+        colors[i->id] = color;
+        colors_lapl[i->id] = color_l;
     }
 
     // 4. Calculate all type of accelerations for each particle
     for (Particle* i : system.getParticles()) {
-        i->force = Vec3(0,0,0);
+        Vec3 acc_pressure, acc_viscosity, acc_interactive, acc_tension, acc_gravity;
+        acc_pressure = acc_viscosity = acc_interactive = acc_tension = acc_gravity = Vec3(0,0,0);
 
-        Vec3 pressure_acc(0,0,0), viscosity_acc(0,0,0), interactive_acc(0,0,0), gravity_acc(0,-9.8,0);
+        for (Particle* j : *neighbours[i->id]) {
+            // Pressure acceleration
+            double pi = pressures[i->id] / std::pow(densities[i->id], 2);
+            double pj = pressures[j->id] / std::pow(densities[j->id], 2);
+            double pij = -j->mass * (pi + pj);
+            Vec3 ij = (i->pos - j->pos);
+            double ijn = ij.norm();
 
-        //std::cout << "Density: " << densities[i->id] << ", Pressure: " << pressures[i->id] << std::endl;
+            acc_pressure += pij * spiky_grad(ij, ijn, kernel_size);
 
-        for (auto j : *neighbours[i->id]) {
-            double pij = j->mass * ((pressures[i->id]/std::pow(densities[i->id],2)) + (pressures[j->id]/std::pow(densities[j->id],2)));
-            Vec3 d = j->pos - i->pos;
-            double r = d.norm();
-
-            pressure_acc += pij * spiky_grad(d, d.norm(), kernel_size);
-
-            Vec3 vij = dyn_viscosity * j->mass * ((j->vel - i->vel)/(densities[i->id]*densities[j->id]));
-            viscosity_acc += vij * viscosity_lapl(r, kernel_size);
+            // Viscosity acceleration
+            Vec3 vij = dyn_viscosity * j->mass * (j->vel - i->vel)/(densities[i->id]*densities[j->id]);
+            acc_viscosity += vij * viscosity_lapl(ijn, kernel_size);
         }
 
-        //std::cout << "Pressure: " << pressure_acc.transpose() << ",  Viscosity: " << viscosity_acc.transpose() << std::endl;
-        Vec3 total_acc = pressure_acc + viscosity_acc + interactive_acc + gravity_acc;
-        i->force = total_acc * i->mass;
+        if (colors[i->id].squaredNorm() > 0.005)
+            acc_tension = (surface_tension/densities[i->id]) * colors_lapl[i->id] * colors[i->id].normalized();
+
+        acc_gravity = Vec3(0,-gravity,0);
+
+        i->force = (acc_pressure + acc_viscosity + acc_interactive + acc_tension + acc_gravity) * i->mass;
     }
 
     // 5. Find new velocities and positions by using the same integration method as before
@@ -371,41 +461,52 @@ void SceneFluid::update(double dt) {
         if (colliderWest.testCollision(p, colInfo)) {
             colliderWest.resolveCollision(p, colInfo, kBounce, kFriction);
         }
-        if (colliderSphere.testCollision(p, colInfo)) {
-            colliderSphere.resolveCollision(p, colInfo, kBounce, kFriction);
-        }
     }
 
-    //6. Colour particles
+    //7. Colour particles
     switch(colour) {
     case ColourMode::Neighbourhood: {
         auto p = system.getParticles()[555];
         p->color = Vec3(0,1,0);
         for (auto o : *neighbours[555]) {
             double norm = (p->pos - o->pos).norm();
-            if (norm <= neighbourhood_size) {
-                o->color = Vec3(1-norm/neighbourhood_size, 0, 0);
+            if (norm <= surface_tension) {
+                o->color = Vec3(1-norm/surface_tension, 0, 0);
             }
         }
     } break;
     case ColourMode::Density:
         for (auto p : system.getParticles()) {
             auto d = densities[p->id];
-            p->color = Vec3((d-1)*10,0,1-(d-1)*10);
+            d-=ref_density;
+            d*=10;
+            if (d < 0) {
+                p->color = Vec3(1+d,1+d,1);
+            } else {
+                p->color = Vec3(1,1-d,1-d);
+            }
         }
         break;
     case ColourMode::Pressure:
         for (auto p : system.getParticles()) {
-            auto d = densities[p->id];
+            auto d = pressures[p->id];
             if (d < 0) {
-                p->color = Vec3(1+d/10,1+d/10,1);
+                p->color = Vec3(1+d,1+d,1);
             } else {
-                p->color = Vec3(1,1-d/10,1-d/10);
+                p->color = Vec3(1,1-d,1-d);
             }
         }
         break;
     case ColourMode::None:
     default:
+        /*
+        for (auto p : system.getParticles()) {
+            p->color
+                = colors[p->id].squaredNorm() > neighbourhood_size
+                ? (colors[p->id].normalized() + Vec3(1,1,1)) * 0.5f
+                : Vec3(1,1,1);
+        }
+        */
         break;
     }
 }
