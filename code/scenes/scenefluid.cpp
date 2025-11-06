@@ -142,7 +142,7 @@ void SceneFluid::reset()
                 //std::cout << pos << std::endl;
 
                 Particle* p = new Particle();
-                p->id = system.getNumParticles();;
+                p->id = system.getNumParticles() - 1;
                 p->pos = pos;
                 p->prevPos = pos;
                 p->vel = Vec3(0,0,0);

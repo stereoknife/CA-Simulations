@@ -2,7 +2,7 @@ QT       += core gui opengl concurrent
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 greaterThan(QT_MAJOR_VERSION, 5): QT += openglwidgets
 
-CONFIG += c++11
+CONFIG += c++20
 
 INCLUDEPATH += code
 INCLUDEPATH += code/scenes
@@ -17,6 +17,7 @@ SOURCES += \
     code/forces.cpp \
     code/glutils.cpp \
     code/glwidget.cpp \
+    code/hashgrid.cxx \
     code/integrators.cpp \
     code/main.cpp \
     code/mainwindow.cpp \
@@ -46,6 +47,7 @@ HEADERS += \
     code/forces.h \
     code/glutils.h \
     code/glwidget.h \
+    code/hashgrid.h \
     code/integrators.h \
     code/mainwindow.h \
     code/model.h \
