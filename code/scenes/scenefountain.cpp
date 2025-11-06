@@ -4,7 +4,7 @@
 #include <QOpenGLFunctions_3_3_Core>
 
 
-SceneFountain::SceneFountain() {
+SceneFountain::SceneFountain() : grid{0, 2} {
     widget = new WidgetFountain();
     connect(widget, SIGNAL(updatedParameters()), this, SLOT(updateSimParams()));
 }
@@ -213,6 +213,9 @@ void SceneFountain::update(double dt) {
         p->vel = Vec3(0,0,0);
     }
 
+    grid.resize(system.getNumParticles());
+    grid.construct(system.getParticles());
+
     // integration step
     Vecd ppos = system.getPositions();
     integrator.step(system, dt);
@@ -232,6 +235,26 @@ void SceneFountain::update(double dt) {
         }
         if (colliderBox.testCollision(p, colInfo)) {
             colliderBox.resolveCollision(p, colInfo, kBounce, kFriction);
+        }
+    }
+
+    cells.clear();
+    grid.all_cells(cells);
+    for (auto s : cells) {
+        for (unsigned int i = 0; i < s.size(); ++i) {
+            auto p = system.getParticle(i);
+            for (unsigned int j = i; j < s.size(); ++j) {
+                auto q = system.getParticle(j);
+                // Create a plane between the 2 particles
+                auto d = p->pos - q->pos;
+                auto c = d / 2.0;
+                auto n = d.normalized();
+                colliderParticle.setPlane((p->pos - q->pos).normalized(), c.dot(n));
+                colliderParticle.testCollision(p, colInfo);
+                colliderParticle.resolveCollision(p, colInfo, kBounce, kFriction);
+                colliderParticle.testCollision(q, colInfo);
+                colliderParticle.resolveCollision(q, colInfo, kBounce, kFriction);
+            }
         }
     }
 

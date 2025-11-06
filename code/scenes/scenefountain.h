@@ -4,6 +4,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <list>
+#include "hashgrid.h"
 #include "scene.h"
 #include "widgetfountain.h"
 #include "particlesystem.h"
@@ -52,7 +53,7 @@ protected:
     std::list<Particle*> deadParticles;
     ForceConstAcceleration* fGravity;
 
-    ColliderPlane colliderFloor, colliderRamp;
+    ColliderPlane colliderFloor, colliderRamp, colliderParticle;
     ColliderSphere colliderSphere;
     ColliderAABB   colliderBox;
 
@@ -62,6 +63,9 @@ protected:
 
     Vec3 fountainPos;
     int mouseX, mouseY;
+
+    HashGrid grid;
+    std::vector<std::span<unsigned int>> cells;
 };
 
 #endif // SCENEFOUNTAIN_H

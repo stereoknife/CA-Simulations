@@ -4,6 +4,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <list>
+#include "hashgrid.h"
 #include "scene.h"
 #include "widgetfluid.h"
 #include "particlesystem.h"
@@ -81,7 +82,8 @@ protected:
     int cell_count;
     ColourMode colour;
 
-    std::vector<std::vector<Particle*>*> neighbours, cells;
+    HashGrid grid;
+    std::vector<std::vector<Particle*>*> neighbours;
     std::vector<double> densities, pressures, colors_lapl;
     std::vector<Vec3> colors;
 

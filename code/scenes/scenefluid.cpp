@@ -2,7 +2,7 @@
 #include "glutils.h"
 #include "model.h"
 
-SceneFluid::SceneFluid() {
+SceneFluid::SceneFluid() : grid{0,0} {
     widget = new WidgetFluid();
     connect(widget, SIGNAL(updatedParameters()), this, SLOT(updateSimParams()));
 }
@@ -17,9 +17,6 @@ SceneFluid::~SceneFluid() {
     if (vaoCube)    delete vaoCube;
     if (fGravity)   delete fGravity;
     for (auto x : neighbours) {
-        if (x) delete x;
-    }
-    for (auto x : cells) {
         if (x) delete x;
     }
 }
@@ -76,12 +73,14 @@ void SceneFluid::initialize() {
     pressures.resize(num_total);
     colors.resize(num_total);
     colors_lapl.resize(num_total);
+
+    //updateSimParams();
+    grid.resize(num_total);
+
     neighbours.resize(num_total);
     for (int i = 0; i < num_total; ++i) {
         neighbours[i] = new std::vector<Particle*>();
     }
-
-    //updateSimParams();
 }
 
 
@@ -97,6 +96,7 @@ void SceneFluid::reset()
 
     double step = particle_size * 2;
 
+    int count = 0;
     for(int i = 0; i < num_z; ++i) {
         for (int j = 0; j < num_y; ++j) {
             for (int k = 0; k < num_x; ++k) {
@@ -111,7 +111,7 @@ void SceneFluid::reset()
                 //std::cout << pos << std::endl;
 
                 Particle* p = new Particle();
-                p->id = system.getNumParticles();
+                p->id = count++;
                 p->pos = pos;
                 p->prevPos = pos;
                 p->vel = Vec3(0,0,0);
@@ -142,7 +142,7 @@ void SceneFluid::reset()
                 //std::cout << pos << std::endl;
 
                 Particle* p = new Particle();
-                p->id = system.getNumParticles() - 1;
+                p->id = count++;
                 p->pos = pos;
                 p->prevPos = pos;
                 p->vel = Vec3(0,0,0);
@@ -156,6 +156,12 @@ void SceneFluid::reset()
             }
         }
     }
+
+    for(auto n : neighbours) {
+        n->clear();
+    }
+
+    grid.construct(system.getParticles());
 }
 
 
@@ -181,20 +187,8 @@ void SceneFluid::updateSimParams()
     surface_tension = widget->getSurfaceTension();
     particle_size = widget->getParticleSize();
     gravity = widget->getGravity();
-    for (auto x : neighbours) {
-        x->resize(surface_tension);
-    }
 
-    cell_count = std::ceil((box_size * 2) / kernel_size);
-
-    for (auto x : cells) {
-        if (x) delete x;
-    }
-
-    cells.resize(cell_count * cell_count * (2 * cell_count));
-    for (int i = 0; i < cell_count * cell_count * (2 * cell_count); ++i) {
-        cells[i] = new std::vector<Particle*>(100);
-    }
+    grid.set_radius(kernel_size * 2);
 }
 
 
@@ -339,25 +333,10 @@ double viscosity_lapl(double r, double h){
     return (45/(M_PI * std::pow(h, 5)))*(1-(r/h));
 }
 
-
-int SceneFluid::hash(Vec3 pos) {
-    int x = std::floor(pos.x() + box_size + kernel_size/2) / kernel_size;
-    int y = std::floor(pos.y() + box_size + kernel_size/2) / kernel_size;
-    int z = std::floor(pos.z() + box_size + kernel_size/2) / kernel_size;
-    return x * cell_count * cell_count + y + cell_count * z;
-}
-
-double ssign(double x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
-
 void SceneFluid::update(double dt) {
     // SPH
     // 0. Populate hash cells
-    for (auto x : cells) {
-        x->clear();
-    }
-    for (Particle* i : system.getParticles()) {
-        cells[hash(i->pos)]->push_back(i);
-    }
+    grid.construct(system.getParticles());
 
     // 1. Find neighbours for each particle and store in a vector
     for (Particle* i : system.getParticles()) {
@@ -365,7 +344,8 @@ void SceneFluid::update(double dt) {
         for (int x = -1; x <= 1; ++x) {
             for (int y = -1; y <= 1; ++y) {
                 for (int z = -1; z <= 1; ++z) {
-                    for (Particle* j : *cells[hash(i->pos + Vec3(x, y, z) * kernel_size)]) {
+                    for (int idx : grid.neighbours(i->pos + Vec3(x, y, z) * kernel_size * 2)) {
+                        auto j = system.getParticle(idx);
                         if (i->id == j->id) continue;
                         if ((i->pos - j->pos).squaredNorm() > kernel_size * kernel_size) continue;
                         neighbours[i->id]->push_back(j);
@@ -462,6 +442,7 @@ void SceneFluid::update(double dt) {
             colliderWest.resolveCollision(p, colInfo, kBounce, kFriction);
         }
     }
+
 
     //7. Colour particles
     switch(colour) {
